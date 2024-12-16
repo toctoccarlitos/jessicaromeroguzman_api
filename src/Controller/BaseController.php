@@ -1,18 +1,23 @@
 <?php
 namespace App\Controller;
 
-use App\Core\Request;
 use App\Core\Response;
+use App\Service\TokenService;
 
 abstract class BaseController
 {
-    protected Request $request;
+    protected TokenService $tokenService;
     protected Response $response;
 
     public function __construct()
     {
-        $this->request = new Request();
+        $this->tokenService = new TokenService(app()->em);
         $this->response = new Response();
+    }
+
+    protected function extractTokenFromHeader(): ?string
+    {
+        return $this->tokenService->extractTokenFromHeader();
     }
 
     protected function json($data, int $status = 200): string

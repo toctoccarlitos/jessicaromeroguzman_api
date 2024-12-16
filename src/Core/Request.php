@@ -3,6 +3,8 @@ namespace App\Core;
 
 class Request
 {
+    private $user = null;
+
     public function getMethod(): string
     {
         return strtolower($_SERVER['REQUEST_METHOD']);
@@ -52,5 +54,25 @@ class Request
     public function isPost(): bool
     {
         return $this->getMethod() === 'post';
+    }
+
+    public function setUser($user): void
+    {
+        $this->user = $user;
+    }
+
+    public function getUser()
+    {
+        return $this->user;
+    }
+
+    public function getUserId(): ?int
+    {
+        return $this->user ? $this->user->uid : null;
+    }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->user && in_array($role, $this->user->roles);
     }
 }

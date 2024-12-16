@@ -12,7 +12,7 @@ $em = require __DIR__ . '/../config/doctrine.php';
 try {
     $admin = new User();
     $admin->setEmail('info@jessicaromeroguzman.com')
-          ->setPassword('85>o,fnA@M-F3D£C')  // Cambia esto por una contraseña segura
+          ->setPassword('...')
           ->setRoles([User::ROLE_ADMIN])
           ->setStatus(User::STATUS_ACTIVE);
 
