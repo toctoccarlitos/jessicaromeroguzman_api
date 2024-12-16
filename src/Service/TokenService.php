@@ -97,14 +97,14 @@ class TokenService
     {
         $key = "blacklisted_token:" . $token;
         $ttl = $this->getRemainingTTL($token);
-        
+
         // Debug
         var_dump([
             'blacklisting_token' => $token,
             'ttl' => $ttl,
             'key' => $key
         ]);
-        
+
         $this->redis->setex($key, $ttl, 'blacklisted');
     }
 
@@ -112,14 +112,14 @@ class TokenService
     {
         $key = "blacklisted_token:" . $token;
         $result = $this->redis->exists($key);
-        
+
         // Debug
         var_dump([
             'checking_blacklist' => $token,
             'key' => $key,
             'is_blacklisted' => (bool)$result
         ]);
-        
+
         return (bool)$result;
     }
 

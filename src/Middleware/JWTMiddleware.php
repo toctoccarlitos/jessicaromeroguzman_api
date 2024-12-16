@@ -24,7 +24,7 @@ class JWTMiddleware
     public function handle(Request $request): bool
     {
         $path = $request->getUrl();
-        
+
         if (in_array($path, self::EXCLUDED_ROUTES)) {
             return true;
         }
@@ -40,7 +40,7 @@ class JWTMiddleware
         }
 
         $jwt = str_replace('Bearer ', '', $headers['Authorization']);
-        
+
         try {
             $decoded = JWT::decode($jwt, new Key($_ENV['JWT_SECRET'], 'HS256'));
             var_dump([

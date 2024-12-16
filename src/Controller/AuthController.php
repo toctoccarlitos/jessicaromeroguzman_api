@@ -17,7 +17,7 @@ class AuthController extends BaseController
     public function login(Request $request): string
     {
         $data = $request->getBody();
-        
+
         if (!isset($data['email']) || !isset($data['password'])) {
             return $this->json([
                 'status' => 'error',
@@ -26,7 +26,7 @@ class AuthController extends BaseController
         }
 
         $user = $this->authService->authenticate($data['email'], $data['password']);
-        
+
         if (!$user) {
             return $this->json([
                 'status' => 'error',
@@ -45,7 +45,7 @@ class AuthController extends BaseController
     public function refresh(Request $request): string
     {
         $data = $request->getBody();
-        
+
         if (!isset($data['refresh_token'])) {
             return $this->json([
                 'status' => 'error',
@@ -54,7 +54,7 @@ class AuthController extends BaseController
         }
 
         $tokens = $this->tokenService->refreshTokens($data['refresh_token']);
-        
+
         if (!$tokens) {
             return $this->json([
                 'status' => 'error',
