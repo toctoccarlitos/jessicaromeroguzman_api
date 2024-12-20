@@ -24,26 +24,32 @@ class Request
 
     public function getBody(): array
     {
-        $data = [];
-
         if ($this->isGet()) {
             foreach ($_GET as $key => $value) {
                 $data[$key] = filter_input(INPUT_GET, $key, FILTER_SANITIZE_SPECIAL_CHARS);
             }
+            return $data ?? [];
         }
 
-        if ($this->isPost()) {
-            $input = json_decode(file_get_contents('php://input'), true);
-            if ($input) {
-                return $input;
-            }
+        // Para POST, PUT, DELETE
+        $contentType = $this->getContentType();
+        $content = file_get_contents('php://input');
 
+        if (str_contains($contentType, 'application/json')) {
+            $data = json_decode($content, true) ?? [];
+        } else {
+            parse_str($content, $data);
             foreach ($_POST as $key => $value) {
                 $data[$key] = filter_input(INPUT_POST, $key, FILTER_SANITIZE_SPECIAL_CHARS);
             }
         }
 
         return $data;
+    }
+
+    private function getContentType(): string
+    {
+        return $_SERVER['CONTENT_TYPE'] ?? '';
     }
 
     public function isGet(): bool
@@ -74,5 +80,10 @@ class Request
     public function hasRole(string $role): bool
     {
         return $this->user && in_array($role, $this->user->roles);
+    }
+
+    public function getQuery(string $key, $default = null)
+    {
+        return $_GET[$key] ?? $default;
     }
 }

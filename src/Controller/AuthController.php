@@ -2,20 +2,25 @@
 namespace App\Controller;
 
 use App\Core\Request;
+use App\Entity\ActivityLog;
 use App\Service\AuthService;
+use App\Service\ActivityService;
 
 class AuthController extends BaseController
 {
     private AuthService $authService;
+    private ActivityService $activityService;
 
     public function __construct()
     {
         parent::__construct();
         $this->authService = new AuthService();
+        $this->activityService = new ActivityService(app()->em);
     }
 
     public function login(Request $request): string
     {
+        // El login ya se registra en AuthService
         $data = $request->getBody();
 
         if (!isset($data['email']) || !isset($data['password'])) {
@@ -34,33 +39,13 @@ class AuthController extends BaseController
             ], 401);
         }
 
+        // Los tokens
+        $currentToken = $this->tokenService->extractTokenFromHeader();
+        if ($currentToken) {
+            $this->tokenService->blacklistToken($currentToken);
+        }
+
         $tokens = $this->tokenService->createTokenPair($user);
-
-        return $this->json([
-            'status' => 'success',
-            'data' => $tokens
-        ]);
-    }
-
-    public function refresh(Request $request): string
-    {
-        $data = $request->getBody();
-
-        if (!isset($data['refresh_token'])) {
-            return $this->json([
-                'status' => 'error',
-                'message' => 'Refresh token is required'
-            ], 400);
-        }
-
-        $tokens = $this->tokenService->refreshTokens($data['refresh_token']);
-
-        if (!$tokens) {
-            return $this->json([
-                'status' => 'error',
-                'message' => 'Invalid or expired refresh token'
-            ], 401);
-        }
 
         return $this->json([
             'status' => 'success',
@@ -70,14 +55,40 @@ class AuthController extends BaseController
 
     public function logout(Request $request): string
     {
-        // Obtener el token actual de la cabecera Authorization
-        $currentToken = $this->tokenService->extractTokenFromHeader();
-        if ($currentToken) {
-            // Agregar el token actual a la blacklist
-            $this->tokenService->blacklistToken($currentToken);
+        if (!$request->getUser()) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'No autorizado'
+            ], 401);
         }
 
-        // Revocar el refresh token
+        $currentToken = $this->tokenService->extractTokenFromHeader();
+
+        if (!$currentToken) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'No token provided'
+            ], 400);
+        }
+
+        // Registrar el logout
+        $user = app()->em->getRepository(\App\Entity\User::class)
+            ->find($request->getUserId());
+            
+        if ($user) {
+            $this->activityService->logActivity(
+                $user,
+                ActivityLog::TYPE_LOGOUT,
+                'Usuario ha cerrado sesión',
+                [
+                    'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+                    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
+                ]
+            );
+        }
+
+        $this->tokenService->blacklistToken($currentToken);
+
         $data = $request->getBody();
         if (isset($data['refresh_token'])) {
             $this->tokenService->revokeRefreshToken($data['refresh_token']);

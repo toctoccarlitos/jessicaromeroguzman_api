@@ -38,6 +38,18 @@ class User
     #[ORM\Column(type: 'datetime')]
     private \DateTime $updatedAt;
 
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTime $emailVerifiedAt = null;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTime $lastLoginAt = null;
+
+    #[ORM\Column(type: 'string', length: 45, nullable: true)]
+    private ?string $lastLoginIp = null;
+
+    #[ORM\Column(type: 'boolean')]
+    private bool $hasSetPassword = false;
+
     public function __construct()
     {
         $this->createdAt = new \DateTime();
@@ -85,14 +97,21 @@ class User
 
     public function getRoles(): array
     {
-        $roles = $this->roles;
-        $roles[] = 'ROLE_USER'; // Siempre incluir ROLE_USER
-        return array_unique($roles);
+        return array_unique($this->roles);
     }
 
     public function setRoles(array $roles): self
     {
-        $this->roles = $roles;
+        // Limpiamos el array de roles existente
+        $this->roles = [];
+
+        // Agregamos los nuevos roles, asegurándonos que sean únicos
+        foreach ($roles as $role) {
+            if (!in_array($role, $this->roles)) {
+                $this->roles[] = $role;
+            }
+        }
+
         return $this;
     }
 
@@ -123,5 +142,49 @@ class User
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function getEmailVerifiedAt(): ?\DateTime
+    {
+        return $this->emailVerifiedAt;
+    }
+
+    public function setEmailVerifiedAt(\DateTime $date): self
+    {
+        $this->emailVerifiedAt = $date;
+        return $this;
+    }
+
+    public function getLastLoginAt(): ?\DateTime
+    {
+        return $this->lastLoginAt;
+    }
+
+    public function setLastLoginAt(\DateTime $date): self
+    {
+        $this->lastLoginAt = $date;
+        return $this;
+    }
+
+    public function getLastLoginIp(): ?string
+    {
+        return $this->lastLoginIp;
+    }
+
+    public function setLastLoginIp(string $ip): self
+    {
+        $this->lastLoginIp = $ip;
+        return $this;
+    }
+
+    public function hasSetPassword(): bool
+    {
+        return $this->hasSetPassword;
+    }
+
+    public function setHasSetPassword(bool $value): self
+    {
+        $this->hasSetPassword = $value;
+        return $this;
     }
 }

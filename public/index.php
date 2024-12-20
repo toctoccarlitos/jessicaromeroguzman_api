@@ -5,6 +5,10 @@ use App\Core\Application;
 use App\Core\Request;
 use App\Controller\AuthController;
 use App\Controller\UserController;
+use App\Controller\ActivationController;
+use App\Controller\ActivityController;
+use App\Controller\PasswordResetController;
+use App\Controller\ProfileController;
 use App\Middleware\JWTMiddleware;
 use Dotenv\Dotenv;
 
@@ -64,11 +68,114 @@ $app->router->get('/api/users', function(Request $request) use ($app) {
             'message' => 'Unauthorized'
         ], 401);
     }
-    return (new UserController($app->em))->list($request);
+    return (new UserController($app->em))->listUsers($request);
+});
+
+// Rutas de usuarios (protegidas)
+$app->router->post('/api/users', function(Request $request) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new UserController($app->em))->create($request);
+});
+
+$app->router->put('/api/users/{id}', function(Request $request, $id) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new UserController($app->em))->update($request, (int)$id);
+});
+
+$app->router->delete('/api/users/{id}', function(Request $request, $id) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new UserController($app->em))->delete($request, (int)$id);
+});
+
+$app->router->post('/api/activate', function(Request $request) use ($app) {
+    return (new ActivationController($app->em))->activate($request);
+});
+
+$app->router->post('/api/activation/resend', function(Request $request) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new ActivationController($app->em))->resendActivation($request);
+});
+
+$app->router->get('/api/profile', function(Request $request) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new ProfileController($app->em))->getProfile($request);
+});
+
+$app->router->post('/api/profile/change-password', function(Request $request) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new ProfileController($app->em))->changePassword($request);
 });
 
 $app->router->post('/api/login', [AuthController::class, 'login']);
 $app->router->post('/api/refresh', [AuthController::class, 'refresh']);
 $app->router->post('/api/logout', [AuthController::class, 'logout']);
+
+$app->router->post('/api/password/reset-request', function(Request $request) use ($app) {
+    return (new PasswordResetController($app->em))->requestReset($request);
+});
+
+$app->router->post('/api/password/reset', function(Request $request) use ($app) {
+    return (new PasswordResetController($app->em))->resetPassword($request);
+});
+
+// Ruta para ver el historial de actividad
+$app->router->get('/api/activity', function(Request $request) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new ActivityController())->getUserActivity($request);
+});
+
+// Ruta para ver los detalles de un usuario específico (incluye actividad reciente)
+$app->router->get('/api/users/{id}/details', function(Request $request, $id) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new ActivityController())->getUserDetails($request, (int)$id);
+});
 
 $app->run();

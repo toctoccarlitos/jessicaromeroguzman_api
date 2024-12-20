@@ -30,10 +30,6 @@ class JWTMiddleware
         }
 
         $headers = getallheaders();
-        var_dump([
-            'headers' => $headers,
-            'path' => $path
-        ]);
 
         if (!isset($headers['Authorization'])) {
             return false;
@@ -42,16 +38,20 @@ class JWTMiddleware
         $jwt = str_replace('Bearer ', '', $headers['Authorization']);
 
         try {
+            if ($this->tokenService->isBlacklisted($jwt)) {
+                return false;
+            }
+
             $decoded = JWT::decode($jwt, new Key($_ENV['JWT_SECRET'], 'HS256'));
-            var_dump([
-                'decoded' => $decoded
-            ]);
+
+            if (time() >= $decoded->exp) {
+                return false;
+            }
+
             $request->setUser($decoded);
             return true;
+
         } catch (\Exception $e) {
-            var_dump([
-                'error' => $e->getMessage()
-            ]);
             return false;
         }
     }

@@ -3,31 +3,22 @@ namespace App\Service;
 
 use App\Entity\User;
 use App\Entity\RefreshToken;
+use App\Entity\BlacklistedToken;
 use Doctrine\ORM\EntityManagerInterface;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
-use Predis\Client;
 
 class TokenService
 {
-    private Client $redis;
-
     public function __construct(
         private readonly EntityManagerInterface $em
     ) {
-        $this->redis = new Client([
-            'scheme' => 'tcp',
-            'host'   => $_ENV['REDIS_HOST'] ?? 'localhost',
-            'port'   => $_ENV['REDIS_PORT'] ?? 6379,
-        ]);
     }
 
     public function createTokenPair(User $user): array
     {
-        // Crear access token (JWT)
         $accessToken = $this->createAccessToken($user);
 
-        // Crear refresh token
         $refreshToken = new RefreshToken($user);
         $this->em->persist($refreshToken);
         $this->em->flush();
@@ -48,10 +39,9 @@ class TokenService
             return null;
         }
 
-        // Revocar el refresh token usado
         $refreshTokenEntity->revoke();
+        $this->em->flush();
 
-        // Crear nuevos tokens
         $user = $refreshTokenEntity->getUser();
         return $this->createTokenPair($user);
     }
@@ -67,6 +57,42 @@ class TokenService
         }
     }
 
+    public function blacklistToken(string $token): void
+    {
+        try {
+            $decoded = JWT::decode($token, new Key($_ENV['JWT_SECRET'], 'HS256'));
+            $expiresAt = new \DateTime();
+            $expiresAt->setTimestamp($decoded->exp);
+
+            $blacklistedToken = new BlacklistedToken($token, $expiresAt);
+
+            $this->em->persist($blacklistedToken);
+            $this->em->flush();
+
+            $this->cleanExpiredTokens();
+        } catch (\Exception $e) {
+            return;
+        }
+    }
+
+    public function isBlacklisted(string $token): bool
+    {
+        $blacklistedToken = $this->em->getRepository(BlacklistedToken::class)
+            ->findOneBy(['token' => $token]);
+
+        return $blacklistedToken !== null && !$blacklistedToken->isExpired();
+    }
+
+    private function cleanExpiredTokens(): void
+    {
+        $qb = $this->em->createQueryBuilder();
+        $qb->delete(BlacklistedToken::class, 'bt')
+           ->where('bt.expiresAt < :now')
+           ->setParameter('now', new \DateTime());
+
+        $qb->getQuery()->execute();
+    }
+
     private function createAccessToken(User $user): string
     {
         $payload = [
@@ -79,59 +105,6 @@ class TokenService
         ];
 
         return JWT::encode($payload, $_ENV['JWT_SECRET'], 'HS256');
-    }
-
-    public function revokeAllUserTokens(User $user): void
-    {
-        $tokens = $this->em->getRepository(RefreshToken::class)
-            ->findBy(['user' => $user, 'isRevoked' => false]);
-
-        foreach ($tokens as $token) {
-            $token->revoke();
-        }
-
-        $this->em->flush();
-    }
-
-    public function blacklistToken(string $token): void
-    {
-        $key = "blacklisted_token:" . $token;
-        $ttl = $this->getRemainingTTL($token);
-
-        // Debug
-        var_dump([
-            'blacklisting_token' => $token,
-            'ttl' => $ttl,
-            'key' => $key
-        ]);
-
-        $this->redis->setex($key, $ttl, 'blacklisted');
-    }
-
-    public function isBlacklisted(string $token): bool
-    {
-        $key = "blacklisted_token:" . $token;
-        $result = $this->redis->exists($key);
-
-        // Debug
-        var_dump([
-            'checking_blacklist' => $token,
-            'key' => $key,
-            'is_blacklisted' => (bool)$result
-        ]);
-
-        return (bool)$result;
-    }
-
-    private function getRemainingTTL(string $token): int
-    {
-        try {
-            $payload = JWT::decode($token, new Key($_ENV['JWT_SECRET'], 'HS256'));
-            $ttl = $payload->exp - time();
-            return max($ttl, 0);
-        } catch (\Exception $e) {
-            return 0;
-        }
     }
 
     public function extractTokenFromHeader(): ?string

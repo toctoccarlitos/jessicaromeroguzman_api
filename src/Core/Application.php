@@ -20,12 +20,6 @@ class Application
         $this->response = new Response();
         $this->router = new Router($this->request, $this->response);
 
-        // Debug temporal
-        // var_dump([
-        //     'env_loaded' => $_ENV,
-        //     'db_config' => require $rootPath . '/config/database.php'
-        // ]);
-
         $this->em = require $rootPath . '/config/doctrine.php';
     }
 
