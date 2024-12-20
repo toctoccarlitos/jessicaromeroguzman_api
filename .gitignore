@@ -1,8 +1,10 @@
 .env
 .env.setup
 .env.backup
+.env.prod
 vendor
 composer.lock
 web.config
 local
 code.txt
+schema.sql
