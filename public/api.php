@@ -1,5 +1,4 @@
 <?php
-
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use App\Core\Application;
@@ -22,6 +21,34 @@ error_reporting(E_ALL);
 $dotenv = Dotenv::createImmutable(dirname(__DIR__));
 $dotenv->load();
 
+function customLog($message, $type = 'INFO') {
+    $logFile = __DIR__ . '/../local/logs/debug.log';
+    $logDir = dirname($logFile);
+
+    // Crear directorio de logs si no existe
+    if (!file_exists($logDir)) {
+        mkdir($logDir, 0777, true);
+    }
+
+    // Formatear el mensaje
+    $timestamp = date('Y-m-d H:i:s');
+    $formattedMessage = "[{$timestamp}] [{$type}] {$message}" . PHP_EOL;
+
+    // Escribir al archivo
+    file_put_contents($logFile, $formattedMessage, FILE_APPEND);
+}
+
+$headers = getallheaders();
+// customLog("Request Headers: " . json_encode($headers), 'DEBUG');
+
+// Registrar método y URI
+// customLog("Request Method: " . $_SERVER['REQUEST_METHOD'], 'DEBUG');
+// customLog("Request URI: " . $_SERVER['REQUEST_URI'], 'DEBUG');
+
+// Registrar el cuerpo de la petición
+$rawInput = file_get_contents('php://input');
+customLog("Raw Input: " . $rawInput, 'DEBUG');
+
 // Headers de seguridad y CORS
 header('Content-Type: application/json');
 header('X-Content-Type-Options: nosniff');
@@ -30,11 +57,25 @@ header('X-XSS-Protection: 1; mode=block');
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+// header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
+    // http_response_code(200);
+    // customLog("OPTIONS request handled", 'DEBUG');
+    exit();
 }
+
+// Obtener la ruta de la URL
+// $request_uri = $_SERVER['REQUEST_URI'];
+// $path = trim(parse_url($request_uri, PHP_URL_PATH), '/');
+// $path = str_replace('api/', '', $path);
+
+// // customLog("Processed Path: " . $path, 'DEBUG');
+
+// // Obtener el cuerpo de la petición
+// $input = file_get_contents('php://input');
+// $data = json_decode($input, true);
 
 // Iniciar aplicación
 $app = new Application(dirname(__DIR__));

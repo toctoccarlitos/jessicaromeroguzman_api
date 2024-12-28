@@ -26,8 +26,63 @@ class AuthController extends BaseController
         if (!isset($data['email']) || !isset($data['password'])) {
             return $this->json([
                 'status' => 'error',
-                'message' => 'Email and password are required'
+                'message' => 'Email and password are required',
+                'body' => $data
             ], 400);
+        }
+
+        // 1. Verificar el token de reCAPTCHA
+        if (!isset($data['recaptcha_token'])) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'reCAPTCHA token is required'
+            ], 400);
+        }
+
+        $recaptchaToken = $data['recaptcha_token'];
+        $recaptchaSecret = getenv($_ENV['reCAPTCHA_SECRET_KEY']);
+
+        $recaptchaResponse = $this->verifyRecaptcha($recaptchaToken, $recaptchaSecret);
+
+        if (!$recaptchaResponse['success']) {
+            // Log para debugging (opcional, pero muy útil)
+            error_log("reCAPTCHA verification failed: " . json_encode($recaptchaResponse));
+
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Invalid reCAPTCHA - ',
+                'recaptcha_token' => $recaptchaToken,
+                'response' => $recaptchaResponse
+            ], 400);
+        }
+
+        // 2. Verificar la acción (IMPORTANTE para v3)
+        if ($recaptchaResponse['action'] !== 'login') { // Comprueba que la acción coincida
+            error_log("reCAPTCHA action mismatch: " . $recaptchaResponse['action']);
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Invalid reCAPTCHA action'
+            ], 400);
+        }
+
+
+        // 3. (Opcional) Verificar el score (recomendado)
+        if ($recaptchaResponse['score'] < 0.5) { // Ajusta el umbral según tus necesidades
+            error_log("reCAPTCHA score too low: " . $recaptchaResponse['score']);
+            return $this->json([
+                'status' => 'error',
+                'message' => 'reCAPTCHA score too low'
+            ], 400);
+        }
+
+        // 4. Si reCAPTCHA es válido, continuar con la autenticación
+        $user = $this->authService->authenticate($data['email'], $data['password']);
+
+        if (!$user) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Invalid credentials'
+            ], 401);
         }
 
         $user = $this->authService->authenticate($data['email'], $data['password']);
@@ -51,6 +106,27 @@ class AuthController extends BaseController
             'status' => 'success',
             'data' => $tokens
         ]);
+    }
+
+    private function verifyRecaptcha(string $token, string $secret): array
+    {
+        $url = 'https://www.google.com/recaptcha/api/siteverify';
+        $data = [
+            'secret' => $secret,
+            'response' => $token
+        ];
+
+        $options = [
+            'http' => [
+                'method' => 'POST',
+                'content' => http_build_query($data)
+            ]
+        ];
+
+        $context = stream_context_create($options);
+        $response = file_get_contents($url, false, $context);
+
+        return json_decode($response, true);
     }
 
     public function logout(Request $request): string
