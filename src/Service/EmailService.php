@@ -4,6 +4,7 @@ namespace App\Service;
 use App\Entity\User;
 use App\Entity\ActivationToken;
 use App\Entity\PasswordResetToken;
+use App\Entity\ContactMessage;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mime\Email;
@@ -145,6 +146,79 @@ class EmailService
                 'error' => $e->getMessage()
             ]);
             throw $e;
+        }
+    }
+
+    public function sendContactConfirmation(ContactMessage $message): void
+    {
+        try {
+            logger()->info('Sending contact confirmation email', [
+                'to' => $message->getEmail()
+            ]);
+
+            $html = $this->renderTemplate('contact_confirmation_email', [
+                'name' => $message->getName(),
+                'message' => $message->getMessage(),
+                'date' => $message->getCreatedAt()->format('d/m/Y H:i')
+            ]);
+
+            $email = (new Email())
+                ->from(new Address($this->fromEmail, $this->fromName))
+                ->to($message->getEmail())
+                ->subject('Hemos recibido tu mensaje')
+                ->html($html);
+
+            $this->mailer->send($email);
+
+            logger()->info('Contact confirmation email sent successfully');
+
+        } catch (\Exception $e) {
+            logger()->error('Failed to send contact confirmation email', [
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    public function sendContactNotification(ContactMessage $message): void
+    {
+        try {
+            $adminEmail = $_ENV['ADMIN_EMAIL'] ?? null;
+            $dashboardUrl = $_ENV['DASHBOARD_URL'] ?? null;
+
+            if (!$adminEmail) {
+                logger()->warning('Admin email not configured, skipping notification email');
+                return;
+            }
+
+            logger()->info('Sending contact notification email', [
+                'to' => $adminEmail,
+                'message_id' => $message->getId()
+            ]);
+
+            $html = $this->renderTemplate('contact_notification_email', [
+                'name' => $message->getName(),
+                'email' => $message->getEmail(),
+                'phone' => $message->getPhone(),
+                'message' => $message->getMessage(),
+                'date' => $message->getCreatedAt()->format('d/m/Y H:i'),
+                'messageId' => $message->getId()
+            ]);
+
+            $email = (new Email())
+                ->from(new Address($this->fromEmail, $this->fromName))
+                ->to($adminEmail)
+                ->subject('Nuevo mensaje de contacto')
+                ->html($html);
+
+            $this->mailer->send($email);
+
+            logger()->info('Contact notification email sent successfully');
+
+        } catch (\Exception $e) {
+            logger()->error('Failed to send contact notification email', [
+                'error' => $e->getMessage()
+            ]);
         }
     }
 }

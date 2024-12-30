@@ -50,6 +50,18 @@ class User
     #[ORM\Column(type: 'boolean')]
     private bool $hasSetPassword = false;
 
+    #[ORM\Column(type: 'string', length: 100)]
+    private string $firstName;
+
+    #[ORM\Column(type: 'string', length: 100)]
+    private string $lastName;
+
+    #[ORM\Column(type: 'date')]
+    private \DateTime $birthDate;
+
+    #[ORM\Column(type: 'string', length: 20)]
+    private string $mobilePhone;
+
     public function __construct()
     {
         $this->createdAt = new \DateTime();
@@ -185,6 +197,50 @@ class User
     public function setHasSetPassword(bool $value): self
     {
         $this->hasSetPassword = $value;
+        return $this;
+    }
+
+    public function getFirstName(): string
+    {
+        return $this->firstName;
+    }
+
+    public function setFirstName(string $firstName): self
+    {
+        $this->firstName = $firstName;
+        return $this;
+    }
+
+    public function getLastName(): string
+    {
+        return $this->lastName;
+    }
+
+    public function setLastName(string $lastName): self
+    {
+        $this->lastName = $lastName;
+        return $this;
+    }
+
+    public function getBirthDate(): \DateTime
+    {
+        return $this->birthDate;
+    }
+
+    public function setBirthDate(\DateTime $birthDate): self
+    {
+        $this->birthDate = $birthDate;
+        return $this;
+    }
+
+    public function getMobilePhone(): string
+    {
+        return $this->mobilePhone;
+    }
+
+    public function setMobilePhone(string $mobilePhone): self
+    {
+        $this->mobilePhone = $mobilePhone;
         return $this;
     }
 }

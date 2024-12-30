@@ -113,6 +113,10 @@ class ActivityController extends BaseController
                 'user' => [
                     'id' => $user->getId(),
                     'email' => $user->getEmail(),
+                    'firstName' => $user->getFirstName(),
+                    'lastName' => $user->getLastName(),
+                    'birthDate' => $user->getBirthDate()->format('Y-m-d'),
+                    'mobilePhone' => $user->getMobilePhone(),
                     'roles' => $user->getRoles(),
                     'status' => $user->getStatus(),
                     'created_at' => $user->getCreatedAt()->format('Y-m-d H:i:s'),

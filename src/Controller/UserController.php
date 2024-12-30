@@ -22,7 +22,7 @@ class UserController extends BaseController
             logger()->warning('Unauthorized profile access attempt');
             return $this->json([
                 'status' => 'error',
-                'message' => 'Unauthorized - No user ID'
+                'message' => 'Unauthorized'
             ], 401);
         }
 
@@ -43,6 +43,10 @@ class UserController extends BaseController
             'data' => [
                 'id' => $user->getId(),
                 'email' => $user->getEmail(),
+                'firstName' => $user->getFirstName(),
+                'lastName' => $user->getLastName(),
+                'birthDate' => $user->getBirthDate()->format('Y-m-d'),
+                'mobilePhone' => $user->getMobilePhone(),
                 'roles' => $user->getRoles(),
                 'status' => $user->getStatus(),
                 'createdAt' => $user->getCreatedAt()->format('Y-m-d H:i:s')
@@ -148,11 +152,22 @@ class UserController extends BaseController
 
         $data = $request->getBody();
 
-        if (!isset($data['email']) || !isset($data['roles'])) {
+        if (!isset($data['email']) || !isset($data['roles']) || 
+            !isset($data['firstName']) || !isset($data['lastName']) || 
+            !isset($data['birthDate']) || !isset($data['mobilePhone'])) {
             logger()->warning('Invalid user creation data', ['data' => $data]);
             return $this->json([
                 'status' => 'error',
-                'message' => 'Email and roles are required'
+                'message' => 'All fields are required: email, roles, firstName, lastName, birthDate, mobilePhone'
+            ], 400);
+        }
+
+        try {
+            $birthDate = new \DateTime($data['birthDate']);
+        } catch (\Exception $e) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Invalid birth date format'
             ], 400);
         }
 
@@ -174,7 +189,11 @@ class UserController extends BaseController
             $user->setEmail($data['email'])
                 ->setRoles($data['roles'])
                 ->setStatus(User::STATUS_PENDING)
-                ->setPassword(bin2hex(random_bytes(8)));
+                ->setPassword(bin2hex(random_bytes(8)))
+                ->setFirstName($data['firstName'])
+                ->setLastName($data['lastName'])
+                ->setBirthDate($birthDate)
+                ->setMobilePhone($data['mobilePhone']);
 
             $this->em->persist($user);
             $this->em->flush();
@@ -196,6 +215,10 @@ class UserController extends BaseController
                 'data' => [
                     'id' => $user->getId(),
                     'email' => $user->getEmail(),
+                    'firstName' => $user->getFirstName(),
+                    'lastName' => $user->getLastName(),
+                    'birthDate' => $user->getBirthDate()->format('Y-m-d'),
+                    'mobilePhone' => $user->getMobilePhone(),
                     'roles' => $user->getRoles(),
                     'status' => $user->getStatus()
                 ]
@@ -243,6 +266,30 @@ class UserController extends BaseController
                 $user->setEmail($data['email']);
             }
 
+            if (isset($data['firstName'])) {
+                $user->setFirstName($data['firstName']);
+            }
+
+            if (isset($data['lastName'])) {
+                $user->setLastName($data['lastName']);
+            }
+
+            if (isset($data['birthDate'])) {
+                try {
+                    $birthDate = new \DateTime($data['birthDate']);
+                    $user->setBirthDate($birthDate);
+                } catch (\Exception $e) {
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => 'Invalid birth date format'
+                    ], 400);
+                }
+            }
+
+            if (isset($data['mobilePhone'])) {
+                $user->setMobilePhone($data['mobilePhone']);
+            }
+
             if (array_key_exists('roles', $data)) {
                 $user->setRoles($data['roles']);
             }
@@ -263,6 +310,10 @@ class UserController extends BaseController
                 'data' => [
                     'id' => $user->getId(),
                     'email' => $user->getEmail(),
+                    'firstName' => $user->getFirstName(),
+                    'lastName' => $user->getLastName(),
+                    'birthDate' => $user->getBirthDate()->format('Y-m-d'),
+                    'mobilePhone' => $user->getMobilePhone(),
                     'roles' => $user->getRoles(),
                     'status' => $user->getStatus(),
                     'createdAt' => $user->getCreatedAt()->format('Y-m-d H:i:s')

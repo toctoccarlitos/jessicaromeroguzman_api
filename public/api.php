@@ -10,6 +10,7 @@ use App\Controller\ActivityController;
 use App\Controller\PasswordResetController;
 use App\Controller\ProfileController;
 use App\Middleware\JWTMiddleware;
+use App\Controller\ContactController;
 use Dotenv\Dotenv;
 
 // Desactivar mostrar errores
@@ -169,6 +170,34 @@ $app->router->get('/api/users/{id}/details', function(Request $request, $id) use
         ], 401);
     }
     return (new ActivityController())->getUserDetails($request, (int)$id);
+});
+
+// Ruta pública para enviar mensajes de contacto
+$app->router->post('/api/contact', function(Request $request) use ($app) {
+    return (new ContactController($app->em))->submit($request);
+});
+
+// Rutas protegidas para administración de mensajes
+$app->router->get('/api/contact/messages', function(Request $request) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new ContactController($app->em))->list($request);
+});
+
+$app->router->put('/api/contact/messages/{id}/status', function(Request $request, $id) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new ContactController($app->em))->updateStatus($request, (int)$id);
 });
 
 $app->run();
