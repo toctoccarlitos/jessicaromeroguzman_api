@@ -27,7 +27,6 @@ class AuthController extends BaseController
             return $this->json([
                 'status' => 'error',
                 'message' => 'Email and password are required',
-                'body' => $data
             ], 400);
         }
 
@@ -40,13 +39,13 @@ class AuthController extends BaseController
         }
 
         $recaptchaToken = $data['recaptcha_token'];
-        $recaptchaSecret = getenv($_ENV['reCAPTCHA_SECRET_KEY']);
-
+        $recaptchaSecret = $_ENV['reCAPTCHA_SECRET_KEY'];
         $recaptchaResponse = $this->verifyRecaptcha($recaptchaToken, $recaptchaSecret);
 
         if (!$recaptchaResponse['success']) {
-            // Log para debugging (opcional, pero muy útil)
-            error_log("reCAPTCHA verification failed: " . json_encode($recaptchaResponse));
+            logger()->error('reCAPTCHA verification failed', [
+                'response' => $recaptchaResponse
+            ]);
 
             return $this->json([
                 'status' => 'error',
@@ -58,17 +57,21 @@ class AuthController extends BaseController
 
         // 2. Verificar la acción (IMPORTANTE para v3)
         if ($recaptchaResponse['action'] !== 'login') { // Comprueba que la acción coincida
-            error_log("reCAPTCHA action mismatch: " . $recaptchaResponse['action']);
+            logger()->error('reCAPTCHA action mismatch', [
+                'expected' => 'login',
+                'received' => $recaptchaResponse['action'] ?? 'none'
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Invalid reCAPTCHA action'
             ], 400);
         }
 
-
         // 3. (Opcional) Verificar el score (recomendado)
         if ($recaptchaResponse['score'] < 0.5) { // Ajusta el umbral según tus necesidades
-            error_log("reCAPTCHA score too low: " . $recaptchaResponse['score']);
+            logger()->error('reCAPTCHA score too low', [
+                'score' => $recaptchaResponse['score'] ?? 0
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'reCAPTCHA score too low'
@@ -111,13 +114,15 @@ class AuthController extends BaseController
     private function verifyRecaptcha(string $token, string $secret): array
     {
         $url = 'https://www.google.com/recaptcha/api/siteverify';
+
         $data = [
             'secret' => $secret,
-            'response' => $token
+            'response' => $token,
         ];
 
         $options = [
             'http' => [
+                'header' => "Content-type: application/x-www-form-urlencoded\r\n",
                 'method' => 'POST',
                 'content' => http_build_query($data)
             ]
@@ -126,7 +131,14 @@ class AuthController extends BaseController
         $context = stream_context_create($options);
         $response = file_get_contents($url, false, $context);
 
-        return json_decode($response, true);
+        if ($response === false) {
+            logger()->error('Error verifying reCAPTCHA', [
+                'error' => error_get_last()
+            ]);
+            return ['success' => false];
+        }
+
+        return json_decode($response, true) ?: ['success' => false];
     }
 
     public function logout(Request $request): string
@@ -150,7 +162,7 @@ class AuthController extends BaseController
         // Registrar el logout
         $user = app()->em->getRepository(\App\Entity\User::class)
             ->find($request->getUserId());
-            
+
         if ($user) {
             $this->activityService->logActivity(
                 $user,

@@ -25,7 +25,7 @@ try {
     // Iniciar el contenido del archivo SQL con comentarios útiles
     $sqlContent = "-- Schema generado automáticamente " . date('Y-m-d H:i:s') . "\n";
     $sqlContent .= "-- Este archivo contiene solo la estructura de la base de datos\n\n";
-    
+
     // Agregar SET para manejar caracteres especiales
     $sqlContent .= "SET NAMES utf8mb4;\n";
     $sqlContent .= "SET FOREIGN_KEY_CHECKS=0;\n\n";

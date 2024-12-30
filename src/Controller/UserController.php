@@ -4,24 +4,22 @@ namespace App\Controller;
 use App\Core\Request;
 use App\Entity\User;
 use Doctrine\ORM\EntityManager;
-use App\Service\Logger\AppLogger;
 
 class UserController extends BaseController
 {
     private EntityManager $em;
-    private AppLogger $logger;
 
     public function __construct(EntityManager $em)
     {
         parent::__construct();
         $this->em = $em;
-        $this->logger = new AppLogger();
     }
 
     public function profile(Request $request): string
     {
         $userId = $request->getUserId();
         if (!$userId) {
+            logger()->warning('Unauthorized profile access attempt');
             return $this->json([
                 'status' => 'error',
                 'message' => 'Unauthorized - No user ID'
@@ -32,12 +30,14 @@ class UserController extends BaseController
             ->find($userId);
 
         if (!$user) {
+            logger()->warning('Profile not found', ['user_id' => $userId]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'User not found'
             ], 404);
         }
 
+        logger()->info('Profile accessed', ['user_id' => $userId]);
         return $this->json([
             'status' => 'success',
             'data' => [
@@ -53,25 +53,33 @@ class UserController extends BaseController
     public function listUsers(Request $request): string
     {
         if (!$request->hasRole('ROLE_ADMIN')) {
+            logger()->warning('Unauthorized users list access attempt', [
+                'user_id' => $request->getUserId()
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Access denied'
             ], 403);
         }
 
-        // Obtener parámetros de query
         $page = (int)($request->getQuery('page', 1));
         $limit = (int)($request->getQuery('limit', 10));
         $search = $request->getQuery('search', '');
         $status = $request->getQuery('status', '');
         $role = $request->getQuery('role', '');
 
-        // Crear query builder
+        logger()->debug('Listing users', [
+            'page' => $page,
+            'limit' => $limit,
+            'search' => $search,
+            'status' => $status,
+            'role' => $role
+        ]);
+
         $qb = $this->em->createQueryBuilder();
         $qb->select('u')
         ->from(User::class, 'u');
 
-        // Aplicar filtros
         if ($search) {
             $qb->andWhere('u.email LIKE :search')
             ->setParameter('search', "%$search%");
@@ -87,18 +95,15 @@ class UserController extends BaseController
             ->setParameter('role', json_encode($role));
         }
 
-        // Obtener total
         $total = clone $qb;
         $totalItems = count($total->getQuery()->getResult());
 
-        // Aplicar paginación
         $qb->setFirstResult(($page - 1) * $limit)
         ->setMaxResults($limit)
         ->orderBy('u.createdAt', 'DESC');
 
         $users = $qb->getQuery()->getResult();
 
-        // Formatear resultados
         $data = array_map(function($user) {
             return [
                 'id' => $user->getId(),
@@ -108,6 +113,12 @@ class UserController extends BaseController
                 'createdAt' => $user->getCreatedAt()->format('Y-m-d H:i:s')
             ];
         }, $users);
+
+        logger()->info('Users list retrieved', [
+            'total' => $totalItems,
+            'page' => $page,
+            'filtered_count' => count($users)
+        ]);
 
         return $this->json([
             'status' => 'success',
@@ -126,6 +137,9 @@ class UserController extends BaseController
     public function create(Request $request): string
     {
         if (!$request->hasRole('ROLE_ADMIN')) {
+            logger()->warning('Unauthorized user creation attempt', [
+                'user_id' => $request->getUserId()
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Access denied'
@@ -134,19 +148,21 @@ class UserController extends BaseController
 
         $data = $request->getBody();
 
-        // Validación básica
         if (!isset($data['email']) || !isset($data['roles'])) {
+            logger()->warning('Invalid user creation data', ['data' => $data]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Email and roles are required'
             ], 400);
         }
 
-        // Verificar si el email ya existe
         $existingUser = $this->em->getRepository(User::class)
             ->findOneBy(['email' => $data['email']]);
 
         if ($existingUser) {
+            logger()->warning('Duplicate email in user creation', [
+                'email' => $data['email']
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Email already exists'
@@ -157,19 +173,23 @@ class UserController extends BaseController
             $user = new User();
             $user->setEmail($data['email'])
                 ->setRoles($data['roles'])
-                ->setStatus(User::STATUS_PENDING)  // Cambiar a PENDING
-                ->setPassword(bin2hex(random_bytes(8))); // Contraseña temporal
+                ->setStatus(User::STATUS_PENDING)
+                ->setPassword(bin2hex(random_bytes(8)));
 
             $this->em->persist($user);
             $this->em->flush();
 
-            // Crear y enviar token de activación
             $activationService = new \App\Service\ActivationService(
                 $this->em,
                 new \App\Service\EmailService()
             );
 
             $token = $activationService->createActivationToken($user);
+
+            logger()->info('User created successfully', [
+                'user_id' => $user->getId(),
+                'email' => $user->getEmail()
+            ]);
 
             return $this->json([
                 'status' => 'success',
@@ -182,9 +202,10 @@ class UserController extends BaseController
             ], 201);
 
         } catch (\Exception $e) {
-            // Log el error
-            $logger = new \App\Service\Logger\AppLogger();
-            $logger->error('Error creating user', ['email' => $data['email']], $e);
+            logger()->error('Error creating user', [
+                'email' => $data['email'],
+                'error' => $e->getMessage()
+            ]);
 
             return $this->json([
                 'status' => 'error',
@@ -197,6 +218,10 @@ class UserController extends BaseController
     {
         try {
             if (!$request->hasRole('ROLE_ADMIN')) {
+                logger()->warning('Unauthorized user update attempt', [
+                    'user_id' => $request->getUserId(),
+                    'target_user_id' => $id
+                ]);
                 return $this->json([
                     'status' => 'error',
                     'message' => 'Access denied'
@@ -207,6 +232,7 @@ class UserController extends BaseController
             $user = $this->em->getRepository(User::class)->find($id);
 
             if (!$user) {
+                logger()->warning('User not found for update', ['user_id' => $id]);
                 return $this->json([
                     'status' => 'error',
                     'message' => 'User not found'
@@ -227,6 +253,11 @@ class UserController extends BaseController
 
             $this->em->flush();
 
+            logger()->info('User updated successfully', [
+                'user_id' => $id,
+                'updates' => array_keys($data)
+            ]);
+
             return $this->json([
                 'status' => 'success',
                 'data' => [
@@ -239,6 +270,10 @@ class UserController extends BaseController
             ]);
 
         } catch (\Exception $e) {
+            logger()->error('Error updating user', [
+                'user_id' => $id,
+                'error' => $e->getMessage()
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Error updating user: ' . $e->getMessage()
@@ -249,6 +284,10 @@ class UserController extends BaseController
     public function delete(Request $request, int $id): string
     {
         if (!$request->hasRole('ROLE_ADMIN')) {
+            logger()->warning('Unauthorized user deletion attempt', [
+                'user_id' => $request->getUserId(),
+                'target_user_id' => $id
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Access denied'
@@ -257,6 +296,7 @@ class UserController extends BaseController
 
         $user = $this->em->getRepository(User::class)->find($id);
         if (!$user) {
+            logger()->warning('User not found for deletion', ['user_id' => $id]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'User not found'
@@ -267,12 +307,17 @@ class UserController extends BaseController
             $user->setStatus(User::STATUS_BLOCKED);
             $this->em->flush();
 
+            logger()->info('User deactivated successfully', ['user_id' => $id]);
             return $this->json([
                 'status' => 'success',
                 'message' => 'User deactivated successfully'
             ]);
 
         } catch (\Exception $e) {
+            logger()->error('Error deactivating user', [
+                'user_id' => $id,
+                'error' => $e->getMessage()
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Error deactivating user'
@@ -283,6 +328,7 @@ class UserController extends BaseController
     public function changePassword(Request $request): string
     {
         if (!$request->getUser()) {
+            logger()->warning('Unauthorized password change attempt');
             return $this->json([
                 'status' => 'error',
                 'message' => 'No autorizado'
@@ -291,8 +337,10 @@ class UserController extends BaseController
 
         $data = $request->getBody();
 
-        // Validar entrada
         if (!isset($data['current_password']) || !isset($data['new_password'])) {
+            logger()->warning('Invalid password change data', [
+                'user_id' => $request->getUserId()
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Contraseña actual y nueva son requeridas'
@@ -304,25 +352,29 @@ class UserController extends BaseController
                 ->find($request->getUserId());
 
             if (!$user || !$user->verifyPassword($data['current_password'])) {
+                logger()->warning('Invalid current password', [
+                    'user_id' => $request->getUserId()
+                ]);
                 return $this->json([
                     'status' => 'error',
                     'message' => 'Contraseña actual incorrecta'
                 ], 400);
             }
 
-            // Validar nueva contraseña
             if (strlen($data['new_password']) < 8) {
+                logger()->warning('Invalid new password length', [
+                    'user_id' => $request->getUserId()
+                ]);
                 return $this->json([
                     'status' => 'error',
                     'message' => 'La nueva contraseña debe tener al menos 8 caracteres'
                 ], 400);
             }
 
-            // Actualizar contraseña
             $user->setPassword($data['new_password']);
             $this->em->flush();
 
-            $this->logger->info('Contraseña cambiada exitosamente', [
+            logger()->info('Password changed successfully', [
                 'user_id' => $user->getId()
             ]);
 
@@ -332,7 +384,10 @@ class UserController extends BaseController
             ]);
 
         } catch (\Exception $e) {
-            $this->logger->error('Error cambiando contraseña', [], $e);
+            logger()->error('Error changing password', [
+                'user_id' => $request->getUserId(),
+                'error' => $e->getMessage()
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Error al cambiar la contraseña'

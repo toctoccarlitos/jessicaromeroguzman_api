@@ -3,15 +3,34 @@ namespace App\Core;
 
 class Response
 {
+    private $statusCode = 200;
+    private $headers = [];
+
     public function setStatusCode(int $code): void
     {
-        http_response_code($code);
+        $this->statusCode = $code;
+    }
+
+    public function addHeader(string $name, string $value): void
+    {
+        $this->headers[$name] = $value;
     }
 
     public function json($data, int $statusCode = 200): string
     {
-        $this->setStatusCode($statusCode);
-        header('Content-Type: application/json');
+        $this->statusCode = $statusCode;
+        $this->addHeader('Content-Type', 'application/json');
+
+        // Buffer the output
+        ob_start();
+
+        // Set status code
+        http_response_code($this->statusCode);
+
+        // Set headers
+        foreach ($this->headers as $name => $value) {
+            header("$name: $value");
+        }
 
         if (is_array($data)) {
             array_walk_recursive($data, function (&$value) {

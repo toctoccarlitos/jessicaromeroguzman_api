@@ -110,11 +110,11 @@ class TokenService
     public function extractTokenFromHeader(): ?string
     {
         $headers = getallheaders();
-        if (!isset($headers['Authorization'])) {
+        if (!isset($headers['Jrg-Authorization'])) {
             return null;
         }
 
-        if (preg_match('/Bearer\s+(.*)$/i', $headers['Authorization'], $matches)) {
+        if (preg_match('/Bearer\s+(.*)$/i', $headers['Jrg-Authorization'], $matches)) {
             return $matches[1];
         }
 

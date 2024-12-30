@@ -105,7 +105,7 @@ def process_files(project_dir, output_file):
         'jest.config.js', 'webpack.config.js', 'requirements.txt', 'Pipfile',
         'Pipfile.lock', 'setup.py', 'MANIFEST.in', 'code_extractor.py', 'code.txt', 'code_extractor_back.py', 'code_extractor_front.py'
     }
-    exclude_patterns = ['*.md', '*.lock', '*.log', '*.txt', '*.yml', '*.yaml', 'LICENSE*']
+    exclude_patterns = ['*.md', '*.lock', '*.log', '*.txt', '*.yml', '*.yaml', 'LICENSE*', '.env*', '*.json', '*.pyc', '*.pyo', '*.map', '*.min.*', '*.swp', '*.swo', '.git*']
     exclude_dirs = {'node_modules', 'venv', 'temp', 'uploads', 'output', 'datastore', 'input', '__pycache__', 'build', 'dist', 'tests', 'vendor', 'local'}
 
     try:

@@ -6,25 +6,27 @@ use App\Entity\User;
 use App\Entity\ActivityLog;
 use App\Service\ActivityService;
 use Doctrine\ORM\EntityManager;
-use App\Service\Logger\AppLogger;
 
 class ProfileController extends BaseController
 {
     private EntityManager $em;
-    private AppLogger $logger;
     private ActivityService $activityService;
 
     public function __construct(EntityManager $em)
     {
         parent::__construct();
         $this->em = $em;
-        $this->logger = new AppLogger();
         $this->activityService = new ActivityService($em);
     }
 
     public function getProfile(Request $request): string
     {
+        logger()->debug("Getting user profile", [
+            'user_id' => $request->getUserId()
+        ]);
+
         if (!$request->getUser()) {
+            logger()->warning("Unauthorized profile access attempt");
             return $this->json([
                 'status' => 'error',
                 'message' => 'No autorizado'
@@ -36,6 +38,9 @@ class ProfileController extends BaseController
                 ->find($request->getUserId());
 
             if (!$user) {
+                logger()->warning("Profile not found", [
+                    'user_id' => $request->getUserId()
+                ]);
                 return $this->json([
                     'status' => 'error',
                     'message' => 'Usuario no encontrado'
@@ -49,6 +54,11 @@ class ProfileController extends BaseController
                 'Usuario ha consultado su perfil'
             );
 
+            logger()->info("Profile retrieved successfully", [
+                'user_id' => $user->getId(),
+                'email' => $user->getEmail()
+            ]);
+
             return $this->json([
                 'status' => 'success',
                 'data' => [
@@ -57,16 +67,17 @@ class ProfileController extends BaseController
                     'roles' => $user->getRoles(),
                     'status' => $user->getStatus(),
                     'createdAt' => $user->getCreatedAt()->format('Y-m-d H:i:s'),
-                    'lastLoginAt' => $user->getLastLoginAt() ? 
+                    'lastLoginAt' => $user->getLastLoginAt() ?
                         $user->getLastLoginAt()->format('Y-m-d H:i:s') : null,
                     'lastLoginIp' => $user->getLastLoginIp()
                 ]
             ]);
 
         } catch (\Exception $e) {
-            $this->logger->error('Error obteniendo perfil', [
-                'user_id' => $request->getUserId()
-            ], $e);
+            logger()->error('Error retrieving profile', [
+                'user_id' => $request->getUserId(),
+                'error' => $e->getMessage()
+            ]);
 
             return $this->json([
                 'status' => 'error',
@@ -78,6 +89,7 @@ class ProfileController extends BaseController
     public function changePassword(Request $request): string
     {
         if (!$request->getUser()) {
+            logger()->warning('Unauthorized password change attempt');
             return $this->json([
                 'status' => 'error',
                 'message' => 'No autorizado'
@@ -87,6 +99,9 @@ class ProfileController extends BaseController
         $data = $request->getBody();
 
         if (!isset($data['current_password']) || !isset($data['new_password'])) {
+            logger()->warning('Password change attempt without required fields', [
+                'user_id' => $request->getUserId()
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Contraseña actual y nueva son requeridas'
@@ -98,13 +113,26 @@ class ProfileController extends BaseController
                 ->find($request->getUserId());
 
             if (!$user || !$user->verifyPassword($data['current_password'])) {
+                logger()->warning('Invalid current password in change attempt', [
+                    'user_id' => $request->getUserId()
+                ]);
                 return $this->json([
                     'status' => 'error',
                     'message' => 'Contraseña actual incorrecta'
                 ], 400);
             }
 
-            // Validaciones de contraseña...
+            // Validaciones de contraseña
+            if (strlen($data['new_password']) < 8) {
+                logger()->warning('Invalid new password length', [
+                    'user_id' => $user->getId(),
+                    'password_length' => strlen($data['new_password'])
+                ]);
+                return $this->json([
+                    'status' => 'error',
+                    'message' => 'La nueva contraseña debe tener al menos 8 caracteres'
+                ], 400);
+            }
 
             // Actualizar contraseña
             $user->setPassword($data['new_password']);
@@ -121,8 +149,9 @@ class ProfileController extends BaseController
                 ]
             );
 
-            $this->logger->info('Contraseña cambiada exitosamente', [
-                'user_id' => $user->getId()
+            logger()->info('Password changed successfully', [
+                'user_id' => $user->getId(),
+                'email' => $user->getEmail()
             ]);
 
             return $this->json([
@@ -131,7 +160,10 @@ class ProfileController extends BaseController
             ]);
 
         } catch (\Exception $e) {
-            $this->logger->error('Error cambiando contraseña', [], $e);
+            logger()->error('Error changing password', [
+                'user_id' => $request->getUserId(),
+                'error' => $e->getMessage()
+            ]);
             return $this->json([
                 'status' => 'error',
                 'message' => 'Error al cambiar la contraseña'

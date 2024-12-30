@@ -25,33 +25,48 @@ class JWTMiddleware
     {
         $path = $request->getUrl();
 
-        if (in_array($path, self::EXCLUDED_ROUTES)) {
+        if (in_array($path, self::EXCLUDED_ROUTES))
+        {
             return true;
         }
 
         $headers = getallheaders();
 
-        if (!isset($headers['Authorization'])) {
+        if (!isset($headers['Jrg-Authorization']))
+        {
             return false;
         }
 
-        $jwt = str_replace('Bearer ', '', $headers['Authorization']);
+        $jwt = str_replace('Bearer ', '', $headers['Jrg-Authorization']);
 
-        try {
-            if ($this->tokenService->isBlacklisted($jwt)) {
+        try
+        {
+            if ($this->tokenService->isBlacklisted($jwt))
+            {
                 return false;
             }
 
             $decoded = JWT::decode($jwt, new Key($_ENV['JWT_SECRET'], 'HS256'));
 
-            if (time() >= $decoded->exp) {
+            if (time() >= $decoded->exp)
+            {
                 return false;
             }
 
-            $request->setUser($decoded);
-            return true;
+            // Crear un objeto con los datos del usuario
+            $user = (object)[
+                'uid' => $decoded->uid,
+                'email' => $decoded->email,
+                'roles' => $decoded->roles
+            ];
 
-        } catch (\Exception $e) {
+            $request->setUser($user);
+
+            return true;
+        }
+        catch (\Exception $e)
+        {
+            logger()->debug("ERROR: " . $e->getMessage());
             return false;
         }
     }

@@ -8,20 +8,18 @@ use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Address;
-use App\Service\Logger\AppLogger;
 
 class EmailService
 {
     private Mailer $mailer;
     private string $fromEmail;
     private string $fromName;
-    private AppLogger $logger;
 
     public function __construct()
     {
-        $this->logger = new AppLogger();
-
         try {
+            logger()->debug('Initializing EmailService');
+
             // Todas las configuraciones desde variables de entorno
             $transport = new EsmtpTransport(
                 $_ENV['MAIL_HOST'],
@@ -36,11 +34,17 @@ class EmailService
             $this->fromEmail = $_ENV['MAIL_FROM'];
             $this->fromName = $_ENV['MAIL_FROM_NAME'];
 
+            logger()->info('EmailService initialized successfully', [
+                'host' => $_ENV['MAIL_HOST'],
+                'port' => $_ENV['MAIL_PORT'],
+                'from_email' => $this->fromEmail
+            ]);
+
         } catch (\Exception $e) {
-            $this->logger->error('Failed to initialize EmailService', [
+            logger()->error('Failed to initialize EmailService', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
-            ], $e);
+            ]);
             throw $e;
         }
     }
@@ -48,6 +52,12 @@ class EmailService
     public function sendActivationEmail(User $user, ActivationToken $token): void
     {
         try {
+            logger()->info('Sending activation email', [
+                'user_id' => $user->getId(),
+                'user_email' => $user->getEmail(),
+                'token_expires' => $token->getExpiresAt()->format('Y-m-d H:i:s')
+            ]);
+
             $activationUrl = $_ENV['APP_URL'] . "/activate?token=" . $token->getToken();
 
             $email = (new Email())
@@ -62,11 +72,17 @@ class EmailService
 
             $this->mailer->send($email);
 
+            logger()->info('Activation email sent successfully', [
+                'user_id' => $user->getId(),
+                'user_email' => $user->getEmail()
+            ]);
+
         } catch (\Exception $e) {
-            $this->logger->error('Failed to send activation email', [
+            logger()->error('Failed to send activation email', [
+                'user_id' => $user->getId(),
                 'user_email' => $user->getEmail(),
                 'error' => $e->getMessage()
-            ], $e);
+            ]);
             throw $e;
         }
     }
@@ -76,8 +92,17 @@ class EmailService
         $templatePath = __DIR__ . "/Templates/$template.php";
 
         if (!file_exists($templatePath)) {
+            logger()->error('Email template not found', [
+                'template' => $template,
+                'path' => $templatePath
+            ]);
             throw new \RuntimeException("Template not found: $template");
         }
+
+        logger()->debug('Rendering email template', [
+            'template' => $template,
+            'data_keys' => array_keys($data)
+        ]);
 
         ob_start();
         extract($data);
@@ -88,6 +113,12 @@ class EmailService
     public function sendPasswordResetEmail(User $user, PasswordResetToken $token): void
     {
         try {
+            logger()->info('Sending password reset email', [
+                'user_id' => $user->getId(),
+                'user_email' => $user->getEmail(),
+                'token_expires' => $token->getExpiresAt()->format('Y-m-d H:i:s')
+            ]);
+
             $resetUrl = $_ENV['APP_URL'] . "/reset-password?token=" . $token->getToken();
 
             $html = $this->renderTemplate('password_reset_email', [
@@ -102,10 +133,17 @@ class EmailService
 
             $this->mailer->send($email);
 
+            logger()->info('Password reset email sent successfully', [
+                'user_id' => $user->getId(),
+                'user_email' => $user->getEmail()
+            ]);
+
         } catch (\Exception $e) {
-            $this->logger->error('Error enviando email de reset', [
-                'user_id' => $user->getId()
-            ], $e);
+            logger()->error('Failed to send password reset email', [
+                'user_id' => $user->getId(),
+                'user_email' => $user->getEmail(),
+                'error' => $e->getMessage()
+            ]);
             throw $e;
         }
     }
