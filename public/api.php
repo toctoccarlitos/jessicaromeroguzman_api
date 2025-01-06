@@ -11,6 +11,7 @@ use App\Controller\PasswordResetController;
 use App\Controller\ProfileController;
 use App\Middleware\JWTMiddleware;
 use App\Controller\ContactController;
+use App\Controller\NewsletterController;
 use Dotenv\Dotenv;
 
 // Desactivar mostrar errores
@@ -198,6 +199,38 @@ $app->router->put('/api/contact/messages/{id}/status', function(Request $request
         ], 401);
     }
     return (new ContactController($app->em))->updateStatus($request, (int)$id);
+});
+
+// Rutas de newsletter
+$app->router->post('/api/newsletter/subscribe', function(Request $request) use ($app) {
+    return (new NewsletterController($app->em))->subscribe($request);
+});
+
+$app->router->get('/api/newsletter/unsubscribe', function(Request $request) use ($app) {
+    return (new NewsletterController($app->em))->unsubscribe($request);
+});
+
+// Rutas protegidas para administración de newsletter
+$app->router->get('/api/newsletter/subscribers', function(Request $request) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new NewsletterController($app->em))->listSubscribers($request);
+});
+
+$app->router->put('/api/newsletter/subscribers/{id}/status', function(Request $request, $id) use ($app) {
+    $middleware = new JWTMiddleware();
+    if (!$middleware->handle($request)) {
+        return $app->response->json([
+            'status' => 'error',
+            'message' => 'Unauthorized'
+        ], 401);
+    }
+    return (new NewsletterController($app->em))->updateSubscriberStatus($request, (int)$id);
 });
 
 $app->run();

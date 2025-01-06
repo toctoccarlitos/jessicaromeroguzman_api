@@ -1,0 +1,1 @@
+- Api para darse de baja de newsletter (Ya hay algunas fucnones, pero falta el proceso completo)

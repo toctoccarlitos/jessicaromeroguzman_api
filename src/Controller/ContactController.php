@@ -53,10 +53,41 @@ class ContactController extends BaseController
             $this->emailService->sendContactConfirmation($message);
             $this->emailService->sendContactNotification($message);
 
-            return $this->json([
+            $responseData = [
                 'status' => 'success',
                 'message' => 'Mensaje enviado exitosamente'
-            ]);
+            ];
+
+            // Manejar suscripción al newsletter si está solicitada
+            if (isset($data['subscribe_newsletter']) && $data['subscribe_newsletter'] === true) {
+                try {
+                    $newsletterController = new NewsletterController($this->em);
+
+                    // Crear una copia limpia de los datos necesarios para el newsletter
+                    $_POST = [];
+                    $_POST['email'] = $data['email'];
+
+                    // Llamar al controlador del newsletter
+                    $newsletterResult = $newsletterController->subscribe($request);
+
+                    // Intentar decodificar la respuesta
+                    $newsletterResponse = json_decode($newsletterResult, true);
+                    if (is_array($newsletterResponse)) {
+                        $responseData['newsletter'] = $newsletterResponse;
+                    }
+                } catch (\Exception $e) {
+                    logger()->error('Newsletter subscription failed', [
+                        'error' => $e->getMessage(),
+                        'email' => $data['email']
+                    ]);
+                    $responseData['newsletter'] = [
+                        'status' => 'error',
+                        'message' => 'Error al procesar la suscripción al newsletter'
+                    ];
+                }
+            }
+
+            return $this->json($responseData);
 
         } catch (\Exception $e) {
             logger()->error('Error submitting contact message', [

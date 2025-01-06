@@ -5,6 +5,7 @@ use App\Entity\User;
 use App\Entity\ActivationToken;
 use App\Entity\PasswordResetToken;
 use App\Entity\ContactMessage;
+use App\Entity\Newsletter;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mime\Email;
@@ -220,5 +221,88 @@ class EmailService
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    public function sendNewsletterConfirmation(Newsletter $newsletter): void
+    {
+        try {
+            logger()->info('Sending newsletter confirmation email', [
+                'email' => $newsletter->getEmail()
+            ]);
+
+            // Crear token para desuscribirse
+            $token = $this->createUnsubscribeToken($newsletter->getEmail());
+            $unsubscribeUrl = $_ENV['APP_URL'] . "/api/newsletter/unsubscribe?token=" . $token;
+
+            $html = $this->renderTemplate('newsletter_confirmation_email', [
+                'unsubscribeUrl' => $unsubscribeUrl
+            ]);
+
+            $email = (new Email())
+                ->from(new Address($this->fromEmail, $this->fromName))
+                ->to($newsletter->getEmail())
+                ->subject('¡Bienvenido a nuestro Newsletter!')
+                ->html($html);
+
+            $this->mailer->send($email);
+
+            logger()->info('Newsletter confirmation email sent successfully');
+
+        } catch (\Exception $e) {
+            logger()->error('Failed to send newsletter confirmation email', [
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    public function sendNewsletterNotification(Newsletter $newsletter): void
+    {
+        try {
+            $adminEmail = $_ENV['ADMIN_EMAIL'] ?? null;
+
+            if (!$adminEmail) {
+                logger()->warning('Admin email not configured, skipping newsletter notification');
+                return;
+            }
+
+            logger()->info('Sending newsletter subscription notification', [
+                'subscriber_email' => $newsletter->getEmail()
+            ]);
+
+            $html = $this->renderTemplate('newsletter_notification_email', [
+                'email' => $newsletter->getEmail(),
+                'date' => $newsletter->getSubscribedAt()->format('d/m/Y H:i'),
+                'isResubscription' => $newsletter->getCreatedAt() != $newsletter->getSubscribedAt()
+            ]);
+
+            $email = (new Email())
+                ->from(new Address($this->fromEmail, $this->fromName))
+                ->to($adminEmail)
+                ->subject('Nueva suscripción al Newsletter')
+                ->html($html);
+
+            $this->mailer->send($email);
+
+            logger()->info('Newsletter notification email sent successfully');
+
+        } catch (\Exception $e) {
+            logger()->error('Failed to send newsletter notification email', [
+                'error' => $e->getMessage()
+            ]);
+            // No relanzamos la excepción ya que es una notificación interna
+        }
+    }
+
+    private function createUnsubscribeToken(string $email): string
+    {
+        // Encriptar el email usando la clave secreta de la aplicación
+        return base64_encode(openssl_encrypt(
+            $email,
+            'AES-256-CBC',
+            $_ENV['APP_SECRET'],
+            0,
+            substr($_ENV['APP_SECRET'], 0, 16)
+        ));
     }
 }
