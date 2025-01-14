@@ -62,12 +62,6 @@ class PasswordResetController extends BaseController
 
                 $this->em->flush();
 
-                logger()->debug('Sending password reset email', [
-                    'user_id' => $user->getId(),
-                    'email' => $user->getEmail(),
-                    'token_expires' => $token->getExpiresAt()->format('Y-m-d H:i:s')
-                ]);
-
                 // Enviar email
                 $this->emailService->sendPasswordResetEmail($user, $token);
             } else {

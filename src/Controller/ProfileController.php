@@ -21,10 +21,6 @@ class ProfileController extends BaseController
 
     public function getProfile(Request $request): string
     {
-        logger()->debug("Getting user profile", [
-            'user_id' => $request->getUserId()
-        ]);
-
         if (!$request->getUser()) {
             logger()->warning("Unauthorized profile access attempt");
             return $this->json([
@@ -53,11 +49,6 @@ class ProfileController extends BaseController
                 ActivityLog::TYPE_PROFILE_VIEW,
                 'Usuario ha consultado su perfil'
             );
-
-            logger()->info("Profile retrieved successfully", [
-                'user_id' => $user->getId(),
-                'email' => $user->getEmail()
-            ]);
 
             return $this->json([
                 'status' => 'success',
@@ -148,11 +139,6 @@ class ProfileController extends BaseController
                     'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
                 ]
             );
-
-            logger()->info('Password changed successfully', [
-                'user_id' => $user->getId(),
-                'email' => $user->getEmail()
-            ]);
 
             return $this->json([
                 'status' => 'success',

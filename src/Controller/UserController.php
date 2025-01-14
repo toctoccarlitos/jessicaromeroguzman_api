@@ -37,7 +37,6 @@ class UserController extends BaseController
             ], 404);
         }
 
-        logger()->info('Profile accessed', ['user_id' => $userId]);
         return $this->json([
             'status' => 'success',
             'data' => [
@@ -71,14 +70,6 @@ class UserController extends BaseController
         $search = $request->getQuery('search', '');
         $status = $request->getQuery('status', '');
         $role = $request->getQuery('role', '');
-
-        logger()->debug('Listing users', [
-            'page' => $page,
-            'limit' => $limit,
-            'search' => $search,
-            'status' => $status,
-            'role' => $role
-        ]);
 
         $qb = $this->em->createQueryBuilder();
         $qb->select('u')
@@ -117,12 +108,6 @@ class UserController extends BaseController
                 'createdAt' => $user->getCreatedAt()->format('Y-m-d H:i:s')
             ];
         }, $users);
-
-        logger()->info('Users list retrieved', [
-            'total' => $totalItems,
-            'page' => $page,
-            'filtered_count' => count($users)
-        ]);
 
         return $this->json([
             'status' => 'success',
@@ -202,13 +187,6 @@ class UserController extends BaseController
                 $this->em,
                 new \App\Service\EmailService()
             );
-
-            $token = $activationService->createActivationToken($user);
-
-            logger()->info('User created successfully', [
-                'user_id' => $user->getId(),
-                'email' => $user->getEmail()
-            ]);
 
             return $this->json([
                 'status' => 'success',
@@ -300,11 +278,6 @@ class UserController extends BaseController
 
             $this->em->flush();
 
-            logger()->info('User updated successfully', [
-                'user_id' => $id,
-                'updates' => array_keys($data)
-            ]);
-
             return $this->json([
                 'status' => 'success',
                 'data' => [
@@ -358,7 +331,6 @@ class UserController extends BaseController
             $user->setStatus(User::STATUS_BLOCKED);
             $this->em->flush();
 
-            logger()->info('User deactivated successfully', ['user_id' => $id]);
             return $this->json([
                 'status' => 'success',
                 'message' => 'User deactivated successfully'
@@ -424,10 +396,6 @@ class UserController extends BaseController
 
             $user->setPassword($data['new_password']);
             $this->em->flush();
-
-            logger()->info('Password changed successfully', [
-                'user_id' => $user->getId()
-            ]);
 
             return $this->json([
                 'status' => 'success',

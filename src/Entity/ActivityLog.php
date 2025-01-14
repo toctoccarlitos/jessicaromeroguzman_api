@@ -8,6 +8,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\HasLifecycleCallbacks]
 class ActivityLog
 {
+    // Constantes existentes
     public const TYPE_LOGIN = 'login';
     public const TYPE_LOGOUT = 'logout';
     public const TYPE_PASSWORD_CHANGE = 'password_change';
@@ -18,14 +19,19 @@ class ActivityLog
     public const TYPE_PROFILE_UPDATE = 'profile_update';
     public const TYPE_EMAIL_VERIFICATION = 'email_verification';
 
+    // Nuevas constantes para eventos de seguridad
+    public const TYPE_SECURITY_SPAM = 'security_spam';
+    public const TYPE_SECURITY_RATE_LIMIT = 'security_rate_limit';
+    public const TYPE_SECURITY_HONEYPOT = 'security_honeypot';
+    public const TYPE_SECURITY_CSRF = 'security_csrf';
+    public const TYPE_SECURITY_RECAPTCHA = 'security_recaptcha';
+    public const TYPE_SECURITY_INVALID_INPUT = 'security_invalid_input';
+    public const TYPE_SECURITY_SUSPICIOUS = 'security_suspicious';
+
     #[ORM\Id]
     #[ORM\Column(type: 'integer')]
     #[ORM\GeneratedValue]
     private ?int $id = null;
-
-    #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(nullable: false)]
-    private User $user;
 
     #[ORM\Column(type: 'string', length: 50)]
     private string $type;
@@ -34,10 +40,10 @@ class ActivityLog
     private string $description;
 
     #[ORM\Column(type: 'string', length: 45, nullable: true)]
-    private ?string $ipAddress;
+    private ?string $ipAddress = null;
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
-    private ?string $userAgent;
+    private ?string $userAgent = null;
 
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $metadata = null;
@@ -45,13 +51,11 @@ class ActivityLog
     #[ORM\Column(type: 'datetime')]
     private \DateTime $createdAt;
 
-    public function __construct(User $user, string $type, string $description)
+    public function __construct(string $type = '', string $description = '', ?string $ipAddress = null)
     {
-        $this->user = $user;
         $this->type = $type;
         $this->description = $description;
-        $this->ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
-        $this->userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+        $this->ipAddress = $ipAddress;
         $this->createdAt = new \DateTime();
     }
 
@@ -60,9 +64,10 @@ class ActivityLog
         return $this->id;
     }
 
-    public function getUser(): User
+    public function setType(string $type): self
     {
-        return $this->user;
+        $this->type = $type;
+        return $this;
     }
 
     public function getType(): string
@@ -70,9 +75,21 @@ class ActivityLog
         return $this->type;
     }
 
+    public function setDescription(string $description): self
+    {
+        $this->description = $description;
+        return $this;
+    }
+
     public function getDescription(): string
     {
         return $this->description;
+    }
+
+    public function setIpAddress(?string $ipAddress): self
+    {
+        $this->ipAddress = $ipAddress;
+        return $this;
     }
 
     public function getIpAddress(): ?string
@@ -80,20 +97,26 @@ class ActivityLog
         return $this->ipAddress;
     }
 
+    public function setUserAgent(?string $userAgent): self
+    {
+        $this->userAgent = $userAgent;
+        return $this;
+    }
+
     public function getUserAgent(): ?string
     {
         return $this->userAgent;
-    }
-
-    public function getMetadata(): ?array
-    {
-        return $this->metadata;
     }
 
     public function setMetadata(?array $metadata): self
     {
         $this->metadata = $metadata;
         return $this;
+    }
+
+    public function getMetadata(): ?array
+    {
+        return $this->metadata;
     }
 
     public function getCreatedAt(): \DateTime

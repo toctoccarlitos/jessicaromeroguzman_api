@@ -20,8 +20,6 @@ class EmailService
     public function __construct()
     {
         try {
-            logger()->debug('Initializing EmailService');
-
             // Todas las configuraciones desde variables de entorno
             $transport = new EsmtpTransport(
                 $_ENV['MAIL_HOST'],
@@ -36,12 +34,6 @@ class EmailService
             $this->fromEmail = $_ENV['MAIL_FROM'];
             $this->fromName = $_ENV['MAIL_FROM_NAME'];
 
-            logger()->info('EmailService initialized successfully', [
-                'host' => $_ENV['MAIL_HOST'],
-                'port' => $_ENV['MAIL_PORT'],
-                'from_email' => $this->fromEmail
-            ]);
-
         } catch (\Exception $e) {
             logger()->error('Failed to initialize EmailService', [
                 'error' => $e->getMessage(),
@@ -54,12 +46,6 @@ class EmailService
     public function sendActivationEmail(User $user, ActivationToken $token): void
     {
         try {
-            logger()->info('Sending activation email', [
-                'user_id' => $user->getId(),
-                'user_email' => $user->getEmail(),
-                'token_expires' => $token->getExpiresAt()->format('Y-m-d H:i:s')
-            ]);
-
             $activationUrl = $_ENV['APP_URL'] . "/activate?token=" . $token->getToken();
 
             $email = (new Email())
@@ -73,11 +59,6 @@ class EmailService
                 ]));
 
             $this->mailer->send($email);
-
-            logger()->info('Activation email sent successfully', [
-                'user_id' => $user->getId(),
-                'user_email' => $user->getEmail()
-            ]);
 
         } catch (\Exception $e) {
             logger()->error('Failed to send activation email', [
@@ -101,11 +82,6 @@ class EmailService
             throw new \RuntimeException("Template not found: $template");
         }
 
-        logger()->debug('Rendering email template', [
-            'template' => $template,
-            'data_keys' => array_keys($data)
-        ]);
-
         ob_start();
         extract($data);
         include $templatePath;
@@ -115,12 +91,6 @@ class EmailService
     public function sendPasswordResetEmail(User $user, PasswordResetToken $token): void
     {
         try {
-            logger()->info('Sending password reset email', [
-                'user_id' => $user->getId(),
-                'user_email' => $user->getEmail(),
-                'token_expires' => $token->getExpiresAt()->format('Y-m-d H:i:s')
-            ]);
-
             $resetUrl = $_ENV['APP_URL'] . "/reset-password?token=" . $token->getToken();
 
             $html = $this->renderTemplate('password_reset_email', [
@@ -135,11 +105,6 @@ class EmailService
 
             $this->mailer->send($email);
 
-            logger()->info('Password reset email sent successfully', [
-                'user_id' => $user->getId(),
-                'user_email' => $user->getEmail()
-            ]);
-
         } catch (\Exception $e) {
             logger()->error('Failed to send password reset email', [
                 'user_id' => $user->getId(),
@@ -153,10 +118,6 @@ class EmailService
     public function sendContactConfirmation(ContactMessage $message): void
     {
         try {
-            logger()->info('Sending contact confirmation email', [
-                'to' => $message->getEmail()
-            ]);
-
             $html = $this->renderTemplate('contact_confirmation_email', [
                 'name' => $message->getName(),
                 'message' => $message->getMessage(),
@@ -170,8 +131,6 @@ class EmailService
                 ->html($html);
 
             $this->mailer->send($email);
-
-            logger()->info('Contact confirmation email sent successfully');
 
         } catch (\Exception $e) {
             logger()->error('Failed to send contact confirmation email', [
@@ -192,11 +151,6 @@ class EmailService
                 return;
             }
 
-            logger()->info('Sending contact notification email', [
-                'to' => $adminEmail,
-                'message_id' => $message->getId()
-            ]);
-
             $html = $this->renderTemplate('contact_notification_email', [
                 'name' => $message->getName(),
                 'email' => $message->getEmail(),
@@ -214,8 +168,6 @@ class EmailService
 
             $this->mailer->send($email);
 
-            logger()->info('Contact notification email sent successfully');
-
         } catch (\Exception $e) {
             logger()->error('Failed to send contact notification email', [
                 'error' => $e->getMessage()
@@ -226,10 +178,6 @@ class EmailService
     public function sendNewsletterConfirmation(Newsletter $newsletter): void
     {
         try {
-            logger()->info('Sending newsletter confirmation email', [
-                'email' => $newsletter->getEmail()
-            ]);
-
             // Crear token para desuscribirse
             $token = $this->createUnsubscribeToken($newsletter->getEmail());
             $unsubscribeUrl = $_ENV['APP_URL'] . "/api/newsletter/unsubscribe?token=" . $token;
@@ -245,8 +193,6 @@ class EmailService
                 ->html($html);
 
             $this->mailer->send($email);
-
-            logger()->info('Newsletter confirmation email sent successfully');
 
         } catch (\Exception $e) {
             logger()->error('Failed to send newsletter confirmation email', [
@@ -266,10 +212,6 @@ class EmailService
                 return;
             }
 
-            logger()->info('Sending newsletter subscription notification', [
-                'subscriber_email' => $newsletter->getEmail()
-            ]);
-
             $html = $this->renderTemplate('newsletter_notification_email', [
                 'email' => $newsletter->getEmail(),
                 'date' => $newsletter->getSubscribedAt()->format('d/m/Y H:i'),
@@ -283,8 +225,6 @@ class EmailService
                 ->html($html);
 
             $this->mailer->send($email);
-
-            logger()->info('Newsletter notification email sent successfully');
 
         } catch (\Exception $e) {
             logger()->error('Failed to send newsletter notification email', [

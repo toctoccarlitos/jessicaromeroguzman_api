@@ -11,3 +11,9 @@ if (!function_exists('logger')) {
         return \App\Service\Logger\AppLogger::getInstance();
     }
 }
+
+if (!function_exists('security')) {
+    function security(): \App\Service\SecurityService {
+        return $GLOBALS['securityService'];
+    }
+}

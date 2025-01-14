@@ -19,4 +19,14 @@ $connection = DriverManager::getConnection(
 );
 
 // Crear EntityManager
-return EntityManager::create($connection, $config);
+$entityManager = EntityManager::create($connection, $config);
+
+$securityService = new \App\Service\SecurityService(
+    $entityManager,
+    new \App\Service\CacheService($entityManager)
+);
+
+// Hacer disponible el servicio globalmente
+$GLOBALS['securityService'] = $securityService;
+
+return $entityManager;

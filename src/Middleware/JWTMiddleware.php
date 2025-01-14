@@ -66,7 +66,7 @@ class JWTMiddleware
         }
         catch (\Exception $e)
         {
-            logger()->debug("ERROR: " . $e->getMessage());
+            logger()->error("ERROR: " . $e->getMessage());
             return false;
         }
     }

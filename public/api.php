@@ -30,10 +30,13 @@ header('Content-Type: application/json');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
+header('Content-Security-Policy: default-src \'self\'; script-src \'self\' https://www.google.com/recaptcha/ https://www.gstatic.com/; frame-src https://www.google.com/recaptcha/');
+header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 
-header('Access-Control-Allow-Origin: *');
+// CORS headers
+header('Access-Control-Allow-Origin: ' . $_ENV['APP_URL']);
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CSRF-Token');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
@@ -231,6 +234,14 @@ $app->router->put('/api/newsletter/subscribers/{id}/status', function(Request $r
         ], 401);
     }
     return (new NewsletterController($app->em))->updateSubscriberStatus($request, (int)$id);
+});
+
+$app->router->get('/api/security/csrf-token', function() use ($app) {
+    $token = security()->generateCSRFToken();
+    return $app->response->json([
+        'status' => 'success',
+        'token' => $token
+    ]);
 });
 
 $app->run();

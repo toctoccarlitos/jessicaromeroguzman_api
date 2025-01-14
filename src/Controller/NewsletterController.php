@@ -22,68 +22,105 @@ class NewsletterController extends BaseController
 
     public function subscribe(Request $request): string
     {
-        $data = $request->getBody();
-
-        if (!isset($data['email'])) {
-            return $this->json([
-                'status' => 'error',
-                'message' => 'Email es requerido'
-            ], 400);
-        }
-
-        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            return $this->json([
-                'status' => 'error',
-                'message' => 'Email inválido'
-            ], 400);
-        }
-
-        $newsletterFlag = false;
-
         try {
-            $newsletter = $this->em->getRepository(Newsletter::class)
-                ->findOneBy(['email' => $data['email']]);
+            // Validación de seguridad
+            $validation = security()->validateRequest($request);
+            if (!$validation['valid']) {
+                logger()->warning('Newsletter security validation failed', [
+                    'reason' => $validation['message']
+                ]);
+                return $this->json([
+                    'status' => 'error',
+                    'message' => $validation['message']
+                ], 400);
+            }
 
-            if ($newsletter) {
-                if ($newsletter->getStatus() === 'active') {
-                    $newsletterFlag = true;
+            $data = $request->getBody();
+
+            if (!isset($data['email'])) {
+                logger()->warning('Newsletter subscription failed - missing email');
+                return $this->json([
+                    'status' => 'error',
+                    'message' => 'Email es requerido'
+                ], 400);
+            }
+
+            // Verificar reCAPTCHA
+            if (!isset($data['recaptcha_token'])) {
+                logger()->warning('Newsletter subscription failed - missing recaptcha token');
+                return $this->json([
+                    'status' => 'error',
+                    'message' => 'Verificación de seguridad requerida'
+                ], 400);
+            }
+
+            // Sanitizar y validar contenido
+            $sanitizedData = security()->sanitizeAndValidate($data);
+            if (!$sanitizedData['valid']) {
+                return $this->json([
+                    'status' => 'error',
+                    'message' => $sanitizedData['message']
+                ], 400);
+            }
+
+            if (!filter_var($sanitizedData['data']['email'], FILTER_VALIDATE_EMAIL)) {
+                return $this->json([
+                    'status' => 'error',
+                    'message' => 'Email inválido'
+                ], 400);
+            }
+
+            $newsletterFlag = false;
+
+            try {
+                $newsletter = $this->em->getRepository(Newsletter::class)
+                    ->findOneBy(['email' => $sanitizedData['data']['email']]);
+
+                if ($newsletter) {
+                    if ($newsletter->getStatus() === 'active') {
+                        $newsletterFlag = true;
+                    } else {
+                        $newsletter->subscribe();
+                    }
+                } else {
+                    $newsletter = new Newsletter();
+                    $newsletter->setEmail($sanitizedData['data']['email']);
                 }
-                else{
-                    // Si existe pero estaba dado de baja, lo reactivamos
-                    $newsletter->subscribe();
+
+                if (!$newsletterFlag) {
+                    $this->em->persist($newsletter);
+                    $this->em->flush();
+
+                    // Enviar emails de confirmación
+                    $this->emailService->sendNewsletterConfirmation($newsletter);
+                    $this->emailService->sendNewsletterNotification($newsletter);
                 }
+
+                return $this->json([
+                    'status' => 'success',
+                    'message' => 'Suscripción exitosa'
+                ]);
+
+            } catch (\Exception $e) {
+                logger()->error('Error subscribing to newsletter', [
+                    'email' => $sanitizedData['data']['email'],
+                    'error' => $e->getMessage()
+                ]);
+
+                return $this->json([
+                    'status' => 'error',
+                    'message' => 'Error al procesar la suscripción'
+                ], 500);
             }
-            else{
-                // Si no existe, creamos uno nuevo
-                $newsletter = new Newsletter();
-                $newsletter->setEmail($data['email']);
-            }
-
-            if(!$newsletterFlag){
-                // Guardar en la base de datos
-                $this->em->persist($newsletter);
-                $this->em->flush();
-            }
-
-
-            // Enviar emails de confirmación
-            $this->emailService->sendNewsletterConfirmation($newsletter);
-            $this->emailService->sendNewsletterNotification($newsletter);
-
-            return $this->json([
-                'status' => 'success',
-                'message' => 'Suscripción exitosa'
-            ]);
 
         } catch (\Exception $e) {
-            logger()->error('Error subscribing to newsletter', [
-                'email' => $data['email'],
+            logger()->error('Error in newsletter subscription', [
                 'error' => $e->getMessage()
             ]);
 
             return $this->json([
                 'status' => 'error',
-                'message' => 'Error al procesar la suscripción'
+                'message' => 'Error al procesar la solicitud'
             ], 500);
         }
     }
