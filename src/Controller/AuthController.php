@@ -88,15 +88,6 @@ class AuthController extends BaseController
             ], 401);
         }
 
-        $user = $this->authService->authenticate($data['email'], $data['password']);
-
-        if (!$user) {
-            return $this->json([
-                'status' => 'error',
-                'message' => 'Invalid credentials'
-            ], 401);
-        }
-
         // Los tokens
         $currentToken = $this->tokenService->extractTokenFromHeader();
         if ($currentToken) {

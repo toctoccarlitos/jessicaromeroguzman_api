@@ -15,6 +15,24 @@ class ActivityService
     {
         $activity = new ActivityLog($type, $description);
 
+        // Asegurar que siempre capturemos IP y User Agent
+        $activity->setIpAddress($_SERVER['REMOTE_ADDR'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? 'unknown');
+        $activity->setUserAgent($_SERVER['HTTP_USER_AGENT'] ?? 'unknown');
+
+        // Agregar información básica a metadata si no existe
+        if (!$metadata) {
+            $metadata = [];
+        }
+
+        // Agregar información del request a metadata
+        $metadata['request_info'] = [
+            'method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+            'uri' => $_SERVER['REQUEST_URI'] ?? 'unknown',
+            'timestamp' => (new \DateTime())->format('Y-m-d H:i:s')
+        ];
+
+        $activity->setMetadata($metadata);
+
         // Solo establecer el usuario si se proporciona
         if ($user !== null) {
             $activity->setUser($user);
