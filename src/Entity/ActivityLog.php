@@ -18,6 +18,9 @@ class ActivityLog
     public const TYPE_PROFILE_VIEW = 'profile_view';
     public const TYPE_PROFILE_UPDATE = 'profile_update';
     public const TYPE_EMAIL_VERIFICATION = 'email_verification';
+    public const TYPE_LOGIN_FAILED = 'login_failed';
+    public const TYPE_LOGIN_INACTIVE = 'login_inactive';
+    public const TYPE_ERROR = 'type_error';
 
     // Nuevas constantes para eventos de seguridad
     public const TYPE_SECURITY_SPAM = 'security_spam';
@@ -50,6 +53,10 @@ class ActivityLog
 
     #[ORM\Column(type: 'datetime')]
     private \DateTime $createdAt;
+
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true)]  // Cambiar a nullable=true
+    private ?User $user = null;  // Hacer la propiedad nullable
 
     public function __construct(string $type = '', string $description = '', ?string $ipAddress = null)
     {
@@ -122,5 +129,16 @@ class ActivityLog
     public function getCreatedAt(): \DateTime
     {
         return $this->createdAt;
+    }
+
+    public function getUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function setUser(?User $user): self
+    {
+        $this->user = $user;
+        return $this;
     }
 }

@@ -11,9 +11,15 @@ class ActivityService
         private readonly EntityManagerInterface $em
     ) {}
 
-    public function logActivity(User $user, string $type, string $description, ?array $metadata = null): ActivityLog
+    public function logActivity(?User $user, string $type, string $description, ?array $metadata = null): ActivityLog
     {
-        $activity = new ActivityLog($user, $type, $description);
+        $activity = new ActivityLog($type, $description);
+
+        // Solo establecer el usuario si se proporciona
+        if ($user !== null) {
+            $activity->setUser($user);
+        }
+
         if ($metadata) {
             $activity->setMetadata($metadata);
         }

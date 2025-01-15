@@ -18,34 +18,53 @@ class AuthService
 
     public function authenticate(string $email, string $password): ?User
     {
-        $user = $this->em->getRepository(User::class)
-            ->findOneBy(['email' => $email]);
+        try {
+            $user = $this->em->getRepository(User::class)
+                ->findOneBy(['email' => $email]);
 
-        if (!$user || !$user->verifyPassword($password)) {
-            return null;
+            if (!$user || !$user->verifyPassword($password)) {
+                // Registrar intento fallido sin usuario
+                $this->activityService->logActivity(
+                    null,
+                    ActivityLog::TYPE_LOGIN_FAILED,
+                    'Intento de inicio de sesión fallido',
+                    ['email' => $email]
+                );
+                return null;
+            }
+
+            if (!$user->isActive()) {
+                $this->activityService->logActivity(
+                    null,
+                    ActivityLog::TYPE_LOGIN_INACTIVE,
+                    'Intento de inicio de sesión con cuenta inactiva',
+                    ['email' => $email]
+                );
+                return null;
+            }
+
+            // Actualizar último login
+            $user->setLastLoginAt(new \DateTime());
+            $user->setLastLoginIp($_SERVER['REMOTE_ADDR'] ?? null);
+
+            // Registrar login exitoso con usuario
+            $this->activityService->logActivity(
+                $user,
+                ActivityLog::TYPE_LOGIN,
+                'Usuario ha iniciado sesión'
+            );
+
+            $this->em->flush();
+            return $user;
+
+        } catch (\Exception $e) {
+            // Registrar error inesperado
+            $this->activityService->logActivity(
+                null,
+                ActivityLog::TYPE_ERROR,
+                'Error durante la autenticación: ' . $e->getMessage()
+            );
+            throw $e;
         }
-
-        if (!$user->isActive()) {
-            return null;
-        }
-
-        // Actualizar último login
-        $user->setLastLoginAt(new \DateTime());
-        $user->setLastLoginIp($_SERVER['REMOTE_ADDR'] ?? null);
-
-        // Registrar actividad
-        $this->activityService->logActivity(
-            $user,
-            ActivityLog::TYPE_LOGIN,
-            'Usuario ha iniciado sesión',
-            [
-                'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
-                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
-            ]
-        );
-
-        $this->em->flush();
-
-        return $user;
     }
 }
